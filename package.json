@@ -5,7 +5,11 @@
   "description": "DROP — The wallet an AI can't be talked into emptying",
   "scripts": {
     "test:contracts": "pnpm --filter drop-contracts test",
-    "build:contracts": "pnpm --filter drop-contracts build"
+    "build:contracts": "pnpm --filter drop-contracts build",
+    "test:schema": "pnpm --filter @drop/intent-schema test",
+    "test:builder": "pnpm --filter @drop/canonical-builder test",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r --filter \"./packages/*\" typecheck"
   },
   "devDependencies": {
     "typescript": "^5.7.3"
