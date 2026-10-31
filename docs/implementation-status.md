@@ -40,13 +40,13 @@ The system is architected across multiple defense-in-depth layers:
 | **Real Chain Integration (Phase 6)** | `contracts/hardhat.config.ts`, `contracts/script/deploy.ts` | **Complete** | Automated | Base Sepolia (`chainId: 84532`) configuration, canonical ERC-4337 v0.7 EntryPoint integration, full deployment automation script with live artifact generation. |
 | **Audit Trail (Phase 7)** | `contracts/src/DropAuditRegistry.sol`, `@drop/audit` | **Complete** | 14 tests | Immutable onchain audit registry and client proof bundle SDK linking mandate, intent, canonical transaction, simulation, diff, and execution receipt. |
 | **Web Interface (Phase 8)** | `apps/web` | *Pending* | Pending | Full dashboard, Mandate Manager, Command Center, DRAIN ME Arena (Tracks A & B), Audit Explorer. |
-| **A2A Escrow (Phase 9)** | `contracts/src/DropEscrow.sol` | *Pending* | Pending | Agent-to-Agent bonded escrow with verification firewalls. |
+| **A2A Escrow (Phase 9)** | `contracts/src/DropEscrow.sol` | **Complete** | 10 tests | Agent-to-Agent bonded escrow with deliverable state-effect verification, worker bond staking, automatic slashing on malicious output, and buyer refund guarantees. |
 
 ---
 
 ## 3. Test Suite Verification Metrics
 
-All 140 tests in the repository run cleanly with zero failures and zero warnings:
+All 150 tests in the repository run cleanly with zero failures and zero warnings:
 
 ```text
 Summary of Test Suites:
@@ -57,15 +57,16 @@ Summary of Test Suites:
 ✔ packages/comparator:              7 passing (123ms)
 ✔ packages/simulator:               4 passing (414ms)
 ✔ packages/audit:                   6 passing (369ms)
-✔ contracts/test:                  74 passing (1.5s)
+✔ contracts/test:                  84 passing (1.5s)
   ├─ DropValidator & SmartAccount: 13 passing
   ├─ Phase 2 Integration:           3 passing
   ├─ Phase 3 Simulation Firewall:   3 passing
   ├─ Phase 4 EIP-712 Mandates:     32 passing
   ├─ Phase 5 ERC-7579 Effect Guard: 15 passing
-  └─ Phase 7 DropAuditRegistry:      8 passing
+  ├─ Phase 7 DropAuditRegistry:      8 passing
+  └─ Phase 9 DropEscrow:            10 passing
 
-Total Test Count: 140 passing, 0 failing.
+Total Test Count: 150 passing, 0 failing.
 ```
 
 TypeScript compilation (`npx tsc --noEmit`) passes with 0 errors across all packages and the `contracts/` workspace.
