@@ -2,8 +2,9 @@
 pragma solidity ^0.8.24;
 
 import { IERC7579Account, IERC7579Execution, Execution } from "../interfaces/IERC7579Account.sol";
-import { IERC7579Module, MODULE_TYPE_VALIDATOR, MODULE_TYPE_EXECUTOR } from "../interfaces/IERC7579Module.sol";
+import { IERC7579Module, MODULE_TYPE_VALIDATOR, MODULE_TYPE_EXECUTOR, MODULE_TYPE_HOOK } from "../interfaces/IERC7579Module.sol";
 import { IValidator } from "../interfaces/IValidator.sol";
+import { IHook } from "../interfaces/IHook.sol";
 import { PackedUserOperation, IEntryPoint, VALIDATION_SUCCESS, VALIDATION_FAILED } from "../interfaces/IERC4337.sol";
 
 /**
@@ -27,6 +28,9 @@ contract ModularSmartAccount is IERC7579Account {
 
     // Default primary validator for UserOperation authentication
     address public defaultValidator;
+
+    // Active execution hook (MODULE_TYPE_HOOK = 4)
+    address public currentHook;
 
     // Execution Mode Constants
     bytes32 public constant EXEC_MODE_SINGLE_CALL = bytes32(0);
@@ -74,6 +78,8 @@ contract ModularSmartAccount is IERC7579Account {
 
         if (moduleTypeId == MODULE_TYPE_VALIDATOR && defaultValidator == address(0)) {
             defaultValidator = module;
+        } else if (moduleTypeId == MODULE_TYPE_HOOK && currentHook == address(0)) {
+            currentHook = module;
         }
 
         IERC7579Module(module).onInstall(initData);
@@ -93,6 +99,9 @@ contract ModularSmartAccount is IERC7579Account {
         if (defaultValidator == module) {
             defaultValidator = address(0);
         }
+        if (currentHook == module) {
+            currentHook = address(0);
+        }
 
         IERC7579Module(module).onUninstall(deInitData);
         emit ModuleUninstalled(moduleTypeId, module);
@@ -107,7 +116,7 @@ contract ModularSmartAccount is IERC7579Account {
     }
 
     function supportsModule(uint256 moduleTypeId) external pure override returns (bool) {
-        return moduleTypeId == MODULE_TYPE_VALIDATOR || moduleTypeId == MODULE_TYPE_EXECUTOR;
+        return moduleTypeId == MODULE_TYPE_VALIDATOR || moduleTypeId == MODULE_TYPE_EXECUTOR || moduleTypeId == MODULE_TYPE_HOOK;
     }
 
     function supportsExecutionMode(bytes32 mode) external pure override returns (bool) {
@@ -159,6 +168,12 @@ contract ModularSmartAccount is IERC7579Account {
         require(bytes1(mode[0]) == 0x00, "MSA: unsupported execution mode");
         require(executionCalldata.length >= 52, "MSA: invalid execution data");
 
+        bytes memory hookData;
+        address hook = currentHook;
+        if (hook != address(0)) {
+            hookData = IHook(hook).preCheck(msg.sender, msg.value, msg.data);
+        }
+
         address target;
         uint256 value;
         assembly {
@@ -176,6 +191,10 @@ contract ModularSmartAccount is IERC7579Account {
                 revert(add(result, 32), mload(result))
             }
         }
+
+        if (hook != address(0)) {
+            IHook(hook).postCheck(hookData);
+        }
     }
 
     function executeFromExecutor(
@@ -184,6 +203,12 @@ contract ModularSmartAccount is IERC7579Account {
     ) external payable override returns (bytes[] memory returnData) {
         require(_installedModules[MODULE_TYPE_EXECUTOR][msg.sender], "MSA: caller not executor module");
         require(bytes1(mode[0]) == 0x00, "MSA: unsupported execution mode");
+
+        bytes memory hookData;
+        address hook = currentHook;
+        if (hook != address(0)) {
+            hookData = IHook(hook).preCheck(msg.sender, msg.value, msg.data);
+        }
 
         address target;
         uint256 value;
@@ -198,6 +223,10 @@ contract ModularSmartAccount is IERC7579Account {
             assembly {
                 revert(add(result, 32), mload(result))
             }
+        }
+
+        if (hook != address(0)) {
+            IHook(hook).postCheck(hookData);
         }
 
         returnData = new bytes[](1);

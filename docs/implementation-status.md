@@ -36,7 +36,7 @@ The system is architected across multiple defense-in-depth layers:
 | **Effect Comparator (Phase 3)** | `packages/comparator` | **Complete** | 7 tests | Strict diff engine verifying that actual simulated effects match expected intent manifests, flagging hidden approvals or rogue recipients. |
 | **Simulation Pipeline (Phase 3)** | `packages/simulator` | **Complete** | 4 tests | Fail-closed transaction simulator executing dry-runs and returning effect manifests. |
 | **Adversarial Simulation Test (Phase 3)** | `contracts/test/Phase3Simulation.test.ts` | **Complete** | 3 tests | End-to-end demonstration where adversarial ERC20 sneaks an infinite approval, detected and blocked by the DROP firewall while validator alone was blind. |
-| **Effect Guard (Phase 5)** | `contracts/src/DropEffectGuard.sol` | *In Progress* | In Progress | ERC-7579 preCheck / postCheck execution hook enforcing state diffs atomically onchain. |
+| **Effect Guard (Phase 5)** | `contracts/src/DropEffectGuard.sol` | **Complete** | 15 tests | ERC-7579 preCheck / postCheck execution hook enforcing token balance deltas, watching spenders, detecting unexpected approvals, blocking reentrancy, and guaranteeing atomic onchain revert. |
 | **Real Chain Integration (Phase 6)** | `apps/web/`, scripts | *Pending* | Pending | Base Sepolia deployment, bundler RPC integration, live UserOps. |
 | **Audit Trail (Phase 7)** | `contracts/src/DropAuditRegistry.sol` | *Pending* | Pending | Onchain cryptographic receipt registry linking mandate, intent, simulation, and execution hash. |
 | **Web Interface (Phase 8)** | `apps/web` | *Pending* | Pending | Full dashboard, Mandate Manager, Command Center, DRAIN ME Arena (Tracks A & B), Audit Explorer. |
@@ -46,7 +46,7 @@ The system is architected across multiple defense-in-depth layers:
 
 ## 3. Test Suite Verification Metrics
 
-All 111 tests in the repository run cleanly with zero failures and zero warnings:
+All 126 tests in the repository run cleanly with zero failures and zero warnings:
 
 ```text
 Summary of Test Suites:
@@ -56,13 +56,14 @@ Summary of Test Suites:
 ✔ packages/decoder:                 6 passing (125ms)
 ✔ packages/comparator:              7 passing (123ms)
 ✔ packages/simulator:               4 passing (414ms)
-✔ contracts/test:                  51 passing (1.0s)
+✔ contracts/test:                  66 passing (2.0s)
   ├─ DropValidator & SmartAccount: 13 passing
   ├─ Phase 2 Integration:           3 passing
   ├─ Phase 3 Simulation Firewall:   3 passing
-  └─ Phase 4 EIP-712 Mandates:     32 passing
+  ├─ Phase 4 EIP-712 Mandates:     32 passing
+  └─ Phase 5 ERC-7579 Effect Guard: 15 passing
 
-Total Test Count: 111 passing, 0 failing.
+Total Test Count: 126 passing, 0 failing.
 ```
 
 TypeScript compilation (`npx tsc --noEmit`) passes with 0 errors across all packages and the `contracts/` workspace.
