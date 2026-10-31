@@ -7,6 +7,7 @@
     "test": "hardhat test"
   },
   "devDependencies": {
+    "@drop/audit": "workspace:*",
     "@drop/canonical-builder": "workspace:*",
     "@drop/comparator": "workspace:*",
     "@drop/decoder": "workspace:*",
