@@ -38,8 +38,7 @@ The system is architected across multiple defense-in-depth layers:
 | **Adversarial Simulation Test (Phase 3)** | `contracts/test/Phase3Simulation.test.ts` | **Complete** | 3 tests | End-to-end demonstration where adversarial ERC20 sneaks an infinite approval, detected and blocked by the DROP firewall while validator alone was blind. |
 | **Effect Guard (Phase 5)** | `contracts/src/DropEffectGuard.sol` | **Complete** | 15 tests | ERC-7579 preCheck / postCheck execution hook enforcing token balance deltas, watching spenders, detecting unexpected approvals, blocking reentrancy, and guaranteeing atomic onchain revert. |
 | **Real Chain Integration (Phase 6)** | `contracts/hardhat.config.ts`, `contracts/script/deploy.ts` | **Complete** | Automated | Base Sepolia (`chainId: 84532`) configuration, canonical ERC-4337 v0.7 EntryPoint integration, full deployment automation script with live artifact generation. |
-| **Audit Trail (Phase 7)** | `contracts/src/DropAuditRegistry.sol`, `@drop/audit` | **Complete** | 14 tests | Immutable onchain audit registry and client proof bundle SDK linking mandate, intent, canonical transaction, simulation, diff, and execution receipt. |
-| **Web Interface (Phase 8)** | `apps/web` | *Pending* | Pending | Full dashboard, Mandate Manager, Command Center, DRAIN ME Arena (Tracks A & B), Audit Explorer. |
+| **Web Interface (Phase 8)** | `apps/web` | **Complete** | Production Build | Full dashboard, Mandate Manager (EIP-712 signer), Security Command Center (6-stage pipeline inspector), DRAIN ME Arena (Tracks A & B with live Firewall ON/OFF toggle), Audit Explorer, and A2A Escrow UI. |
 | **A2A Escrow (Phase 9)** | `contracts/src/DropEscrow.sol` | **Complete** | 10 tests | Agent-to-Agent bonded escrow with deliverable state-effect verification, worker bond staking, automatic slashing on malicious output, and buyer refund guarantees. |
 
 ---
