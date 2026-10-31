@@ -236,6 +236,13 @@ describe("Phase 3 — Simulation Pipeline, Effect Decoder & Intent-vs-Effect Fir
   // CASE B: Unexpected Execution Effect (Caught by Simulation Firewall)
   // =========================================================================
   it("Case B: Permitted transfer calldata sent to AdversarialMockUSDC is BLOCKED by Simulation Firewall before submission", async function () {
+    // 0. Initial state verification: Attacker has zero allowance
+    const initialAllowance = await adversarialMockUSDC.read.allowance([
+      realSmartAccount.address,
+      attackerWallet.account.address,
+    ]);
+    expect(initialAllowance).to.equal(0n);
+
     // 1. Agent proposes intent to send 400 USDC to Supplier A using AdversarialMockUSDC
     const intent = {
       version: "1" as const,
@@ -253,42 +260,72 @@ describe("Phase 3 — Simulation Pipeline, Effect Decoder & Intent-vs-Effect Fir
     const compiled = buildCanonicalTransaction(intent);
     expect(compiled.transaction.callData.slice(0, 10)).to.equal("0xa9059cbb"); // transfer selector!
 
-    // Note: If submitted blindly, DropValidator would see valid transfer(supplierA, 400) and pass!
-    // But DROP routes through the simulation firewall first:
+    // 3. Prove Onchain Validator Blindness:
+    // If evaluated purely by DropValidator, the calldata looks 100% benign (transfer 400 USDC to Supplier A)
+    const { userOp, opHash } = await packageUserOp(compiled.executionData.accountCalldata);
+    const { result: validationData } = await dropValidator.simulate.validateUserOp([userOp, opHash]);
+    const authorizer = Number(BigInt(validationData) & 0xffffffffn);
+    expect(authorizer).to.equal(0); // DropValidator validates successfully because calldata matches policy!
 
-    // 3. Simulate execution on EVM
-    // Dry-run call via publicClient to capture transaction effects
-    const txHash = await deployerWallet.sendTransaction({
-      to: realSmartAccount.address,
-      data: compiled.executionData.accountCalldata,
-    });
-    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+    // 4. Take EVM snapshot before simulated execution to ensure test isolation
+    const snapshotId = await publicClient.request({ method: "evm_snapshot" as any });
 
-    // 4. Effect Decoder decodes raw receipt logs
-    const actualManifest = decodeSimulationOutput({
-      success: receipt.status === "success",
-      logs: receipt.logs,
-      gasUsed: receipt.gasUsed,
-      isComplete: true,
-    });
+    try {
+      // 5. Simulate execution on EVM
+      const txHash = await deployerWallet.sendTransaction({
+        to: realSmartAccount.address,
+        data: compiled.executionData.accountCalldata,
+      });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
 
-    // Actual manifest contains the transfer AND the stealth approval!
-    expect(actualManifest.effects.length).to.equal(2);
-    expect(actualManifest.effects[0].type).to.equal("ERC20_TRANSFER");
-    expect(actualManifest.effects[1].type).to.equal("ERC20_APPROVAL");
+      // 6. GENUINE STATE INSPECTION:
+      // Verify that the adversarial fixture genuinely changed onchain state during execution!
+      const simulatedAllowance = await adversarialMockUSDC.read.allowance([
+        realSmartAccount.address,
+        attackerWallet.account.address,
+      ]);
+      const MAX_UINT256 = (1n << 256n) - 1n;
+      expect(simulatedAllowance).to.equal(MAX_UINT256); // State modification confirmed!
 
-    // 5. Multiset Comparator compares ExpectedEffectManifest vs ActualEffectManifest
-    const diff = compareEffectManifests(compiled.expectedManifest, actualManifest);
-    expect(diff.matches).to.be.false;
-    expect(diff.reasonCode).to.equal("UNEXPECTED_APPROVAL");
-    expect(diff.unexpectedEffects.length).to.equal(1);
+      const simulatedSupplierBalance = await adversarialMockUSDC.read.balanceOf([
+        supplierAWallet.account.address,
+      ]);
+      expect(simulatedSupplierBalance).to.equal(MAX_TX_AMOUNT);
 
-    // 6. Firewall Decision Engine
-    const decision = evaluateFirewallDecision(diff);
-    expect(decision.verdict).to.equal("BLOCK");
-    expect(decision.reasonCode).to.equal("UNEXPECTED_APPROVAL");
+      // 7. Effect Decoder decodes raw receipt logs
+      const actualManifest = decodeSimulationOutput({
+        success: receipt.status === "success",
+        logs: receipt.logs,
+        gasUsed: receipt.gasUsed,
+        isComplete: true,
+      });
 
-    // CRITICAL RESULT: Firewall BLOCKS the transaction!
+      // Actual manifest contains both the transfer AND the stealth approval!
+      expect(actualManifest.effects.length).to.equal(2);
+      expect(actualManifest.effects[0].type).to.equal("ERC20_TRANSFER");
+      expect(actualManifest.effects[1].type).to.equal("ERC20_APPROVAL");
+
+      // 8. Multiset Comparator compares ExpectedEffectManifest vs ActualEffectManifest
+      const diff = compareEffectManifests(compiled.expectedManifest, actualManifest);
+      expect(diff.matches).to.be.false;
+      expect(diff.reasonCode).to.equal("UNEXPECTED_APPROVAL");
+      expect(diff.unexpectedEffects.length).to.equal(1);
+
+      // 9. Firewall Decision Engine
+      const decision = evaluateFirewallDecision(diff);
+      expect(decision.verdict).to.equal("BLOCK");
+      expect(decision.reasonCode).to.equal("UNEXPECTED_APPROVAL");
+
+      // CRITICAL RESULT: Firewall BLOCKS submission of this UserOp!
+    } finally {
+      // 10. Revert EVM snapshot to reset simulated state
+      await publicClient.request({ method: "evm_revert" as any, params: [snapshotId] as any });
+      const postRevertAllowance = await adversarialMockUSDC.read.allowance([
+        realSmartAccount.address,
+        attackerWallet.account.address,
+      ]);
+      expect(postRevertAllowance).to.equal(0n);
+    }
   });
 
   // =========================================================================
